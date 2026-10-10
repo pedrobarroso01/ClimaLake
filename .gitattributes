@@ -1,0 +1,7 @@
+# Normaliza os finais de linha para LF no repositório (evita CRLF dentro dos containers Linux).
+* text=auto eol=lf
+
+*.sh text eol=lf
+*.jar binary
+*.png binary
+*.jpg binary

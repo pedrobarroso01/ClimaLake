@@ -1,0 +1,93 @@
+# ==========================================
+# ClimaLake - .gitignore
+# ==========================================
+
+# ------------------------------------------
+# Segredos e configuração local
+# (NUNCA versionar: contém perfil/bucket/caminhos da sua máquina)
+# ------------------------------------------
+.env
+.env.*
+!.env.example
+
+# Credenciais e chaves
+.aws/
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+credentials
+service-account*.json
+
+# ------------------------------------------
+# Apache Airflow (arquivos gerados em runtime)
+# ------------------------------------------
+# O airflow.cfg gerado contém fernet_key, secret_key e jwt_secret
+# e é recriado automaticamente pelo Airflow na primeira execução.
+/config/airflow.cfg
+/config/webserver_config.py
+/config/*.generated
+simple_auth_manager_passwords.json.generated
+airflow.db
+airflow-webserver.pid
+*.db
+*.sqlite
+*.sqlite3
+
+# Mantém a pasta logs/ no repositório, mas ignora seu conteúdo gerado.
+/logs/*
+!/logs/.gitkeep
+*.log
+
+# ------------------------------------------
+# Dados gerados pelo pipeline
+# (Bronze/Silver baixados do S3 para processamento local)
+# ------------------------------------------
+/data/
+
+# ------------------------------------------
+# Artefatos de instalação gerados na raiz do projeto
+# (ex.: share/py4j/*.jar criado pela instalação do PySpark)
+# ------------------------------------------
+/share/
+
+# ------------------------------------------
+# Python
+# ------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# ------------------------------------------
+# Spark
+# ------------------------------------------
+.sparkStaging/
+spark-warehouse/
+metastore_db/
+derby.log
+
+# ------------------------------------------
+# IDEs e sistema operacional
+# ------------------------------------------
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+.streamlit/secrets.toml

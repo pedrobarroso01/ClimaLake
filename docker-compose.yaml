@@ -1,0 +1,178 @@
+# ClimaLake - Apache Airflow 3.3.2
+# Desenvolvimento local com SQLite e LocalExecutor.
+
+x-airflow-common: &airflow-common
+  build: .
+  env_file:
+    - ${ENV_FILE_PATH:-.env}
+
+  environment: &airflow-common-env
+    # Executor local: sem Redis ou Celery.
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+
+    # Autenticação do Airflow.
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+
+    # SQLite: banco persistente compartilhado pelos serviços.
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/sqlite/airflow.db
+
+    # Configurações gerais.
+    AIRFLOW__CORE__FERNET_KEY: ${FERNET_KEY:?Defina FERNET_KEY no .env (veja o README)}
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+
+    # Autenticação da API.
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET:?Defina AIRFLOW__API_AUTH__JWT_SECRET no .env (veja o README)}
+    AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
+
+    # Monitoramento.
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+
+    # Dependências opcionais.
+    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+
+    # Arquivo de configuração.
+    AIRFLOW_CONFIG: /opt/airflow/config/airflow.cfg
+
+    # Código Python do ClimaLake (pacote `climalake`, em src/).
+    PYTHONPATH: /opt/airflow/project/src
+
+    # Configuração AWS.
+    AWS_PROFILE: ${AWS_PROFILE:-climalake}
+    AWS_REGION: ${AWS_REGION:-us-east-1}
+    AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+    S3_BUCKET: ${S3_BUCKET:-}
+
+    # Arquivos de configuração e credenciais AWS.
+    AWS_SHARED_CREDENTIALS_FILE: /opt/airflow/aws/credentials
+    AWS_CONFIG_FILE: /opt/airflow/aws/config
+
+    # Cache de autenticação gerado por `aws login`.
+    AWS_LOGIN_CACHE_DIRECTORY: /opt/airflow/aws/login/cache
+
+  volumes:
+    - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+    - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+    - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+
+    # Arquivos Python do ClimaLake.
+    - ${AIRFLOW_PROJ_DIR:-.}:/opt/airflow/project
+
+    # Banco SQLite persistente.
+    - airflow-sqlite-volume:/opt/airflow/sqlite
+
+    # Configuração AWS: somente leitura.
+    - type: bind
+      source: ${AWS_HOST_DIR:?Defina AWS_HOST_DIR no .env (caminho da sua pasta .aws)}
+      target: /opt/airflow/aws
+      read_only: true
+
+    # Cache de login AWS: leitura e escrita para atualização da sessão.
+    - type: bind
+      source: ${AWS_HOST_DIR:?Defina AWS_HOST_DIR no .env (caminho da sua pasta .aws)}/login/cache
+      target: /opt/airflow/aws/login/cache
+      read_only: false
+
+  user: "${AIRFLOW_UID:-50000}:0"
+
+services:
+  # Interface web e API do Airflow.
+  airflow-apiserver:
+    <<: *airflow-common
+    command: api-server
+
+    ports:
+      # Somente localhost: não expõe a interface (e a senha) para a rede.
+      - "127.0.0.1:8080:8080"
+
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - http://localhost:8080/api/v2/monitor/health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+    restart: unless-stopped
+
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Agenda e executa as tarefas.
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"'
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+    restart: unless-stopped
+
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Identifica e processa os arquivos das DAGs.
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"'
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+    restart: unless-stopped
+
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Inicializa o banco e cria o usuário de acesso.
+  airflow-init:
+    <<: *airflow-common
+
+    entrypoint: /bin/bash
+
+    command:
+      - -c
+      - |
+        if [[ -z "$${AIRFLOW_UID}" ]]; then
+          export AIRFLOW_UID=50000
+        fi
+
+        mkdir -p /opt/airflow/{logs,dags,plugins,config,sqlite}
+        chown -R "$${AIRFLOW_UID}:0" /opt/airflow/{logs,dags,plugins,config,sqlite}
+
+        exec /entrypoint airflow version
+
+    environment:
+      <<: *airflow-common-env
+
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:?Defina _AIRFLOW_WWW_USER_PASSWORD no .env (veja o README)}
+
+      _PIP_ADDITIONAL_REQUIREMENTS: ""
+
+    user: "0:0"
+
+volumes:
+  airflow-sqlite-volume:
