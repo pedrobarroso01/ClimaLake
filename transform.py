@@ -37,33 +37,94 @@ def transformar_gold(caminho_local):
 
 
     spark = SparkSession.builder.appName("App").getOrCreate()
+    spark.sparkContext.setLogLevel("ERROR")
 
-    df_silver = spark.read.option("multiline",True).json(caminho_local)
+    df_silver = spark.read.parquet(caminho_local)
 
     df = df_silver.groupBy().agg(
-        round(min("Temperatura °C").cast(DoubleType()),1).alias("Temperatura Mínima °C"),
-        date_format(min_by(df_silver["Horário"],df_silver["Temperatura °C"]),"yyyy-MM-dd HH:mm").alias("Horário Temperatura Mínima °C"),
+        round(min("Temperatura °C").cast(DoubleType()), 1)
+            .alias("Temperatura Mínima °C"),
 
-        round(max("Temperatura °C").cast(DoubleType()),1).alias("Temperatura Máxima °C"),
-        date_format(max_by(df_silver["Horário"],df_silver["Temperatura °C"]),"yyyy-MM-dd HH:mm").alias("Horário Temperatura Máxima °C"),
+        date_format(
+            min_by(df_silver["Horário"], df_silver["Temperatura °C"]),
+            "yyyy-MM-dd HH:mm"
+        ).alias("Horário Temperatura Mínima °C"),
 
-        round(avg("Temperatura °C").cast(DoubleType()),1).alias("Temperatura Média °C"),
+        round(max("Temperatura °C").cast(DoubleType()), 1)
+            .alias("Temperatura Máxima °C"),
 
-        round(sum("Precipitação (mm)").cast(DoubleType()),1).alias("Precipitação Total (mm)"),
+        date_format(
+            max_by(df_silver["Horário"], df_silver["Temperatura °C"]),
+            "yyyy-MM-dd HH:mm"
+        ).alias("Horário Temperatura Máxima °C"),
 
-        concat(round(min(regexp_replace("Humidade Relativa do Ar","%","").cast(DoubleType())),0).cast("int").cast("string"),lit("%")).alias("Humidade Relativa do Ar Mínima"),
-        date_format(min_by(df_silver["Horário"],regexp_replace("Humidade Relativa do Ar","%","").cast(DoubleType())),"yyyy-MM-dd HH:mm").alias("Horário Humidade Relativa do Ar Mínima °C"),
+        round(avg("Temperatura °C").cast(DoubleType()), 1)
+            .alias("Temperatura Média °C"),
 
-        concat(round(max(regexp_replace("Humidade Relativa do Ar","%","").cast(DoubleType())),0).cast("int").cast("string"),lit("%")).alias("Humidade Relativa do Ar Máxima"),
-        date_format(max_by(df_silver["Horário"],regexp_replace("Humidade Relativa do Ar","%","").cast(DoubleType())),"yyyy-MM-dd HH:mm").alias("Horário Humidade Relativa do Ar Máxima °C"),
+        round(sum("Precipitação (mm)").cast(DoubleType()), 1)
+            .alias("Precipitação Total (mm)"),
 
-        concat(round(avg(regexp_replace("Humidade Relativa do Ar","%","").cast(DoubleType())),0).cast("int").cast("string"),lit("%")).alias("Humidade Relativa do Ar Média")
+        concat(
+            round(
+                min(
+                    regexp_replace(
+                        "Humidade Relativa do Ar", "%", ""
+                    ).cast(DoubleType())
+                ), 0
+            ).cast("int").cast("string"),
+            lit("%")
+        ).alias("Humidade Relativa do Ar Mínima"),
+
+        date_format(
+            min_by(
+                df_silver["Horário"],
+                regexp_replace(
+                    "Humidade Relativa do Ar", "%", ""
+                ).cast(DoubleType())
+            ),
+            "yyyy-MM-dd HH:mm"
+        ).alias("Horário Humidade Relativa do Ar Mínima °C"),
+
+        concat(
+            round(
+                max(
+                    regexp_replace(
+                        "Humidade Relativa do Ar", "%", ""
+                    ).cast(DoubleType())
+                ), 0
+            ).cast("int").cast("string"),
+            lit("%")
+        ).alias("Humidade Relativa do Ar Máxima"),
+
+        date_format(
+            max_by(
+                df_silver["Horário"],
+                regexp_replace(
+                    "Humidade Relativa do Ar", "%", ""
+                ).cast(DoubleType())
+            ),
+            "yyyy-MM-dd HH:mm"
+        ).alias("Horário Humidade Relativa do Ar Máxima °C"),
+
+        concat(
+            round(
+                avg(
+                    regexp_replace(
+                        "Humidade Relativa do Ar", "%", ""
+                    ).cast(DoubleType())
+                ), 0
+            ).cast("int").cast("string"),
+            lit("%")
+        ).alias("Humidade Relativa do Ar Média")
     )
 
     # Amplitude (Temperatura Máxima - Temperatura Mínima)
     df = df.withColumn(
-        "Amplitude Térmica", 
-        round(df["Temperatura Máxima °C"] - df["Temperatura Mínima °C"],1)
+        "Amplitude Térmica",
+        round(
+            df["Temperatura Máxima °C"] - df["Temperatura Mínima °C"],
+            1
+        )
     )
 
     return df
