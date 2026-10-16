@@ -6,7 +6,7 @@ from pathlib import Path, PurePosixPath
 from config import s3_client
 
 # Diretório raiz do projeto ClimaLake.
-PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_DIR / "data"
 
 CAMADAS_IMPORTAVEIS = ("bronze", "silver")
