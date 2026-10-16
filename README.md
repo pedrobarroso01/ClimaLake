@@ -112,11 +112,12 @@ ClimaLake/
 │       └── dashboard.png       # Imagem do dashboard exibida neste README
 ├── dashboard/
 │   └── ClimaLake.pbix          # Arquivo do dashboard no Power BI
-├── config.py                   # Variáveis de ambiente e cliente S3
-├── extracao.py                 # Consulta à API Open-Meteo
-├── importacao.py               # Leitura de objetos Bronze/Silver
-├── ingestao.py                 # Gravação das camadas no S3
-├── transform.py                # Transformações PySpark Silver e Gold
+├── src/
+│   └── config.py                   # Variáveis de ambiente e cliente S3
+│   └── extracao.py                 # Consulta à API Open-Meteo
+│   └── importacao.py               # Leitura de objetos Bronze/Silver
+│   └── ingestao.py                 # Gravação das camadas no S3
+│   └── transform.py                # Transformações PySpark Silver e Gold
 ├── Dockerfile                  # Imagem do Airflow e dependências
 ├── docker-compose.yaml         # Execução local do ambiente
 ├── requirements.txt            # Dependências Python
